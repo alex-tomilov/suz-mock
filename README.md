@@ -20,6 +20,14 @@ Small local mock for contract/development tests when real SUZ credentials are
 unavailable. It focuses on stable response shapes for API v3 client code while
 remaining deliberately detached from real SUZ services.
 
+## Project metadata
+
+- License: MIT, see [LICENSE](LICENSE).
+- Security policy: see [SECURITY.md](SECURITY.md).
+- Contribution guide: see [CONTRIBUTING.md](CONTRIBUTING.md).
+- Code of conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Changes: see [CHANGELOG.md](CHANGELOG.md).
+
 ## Run
 
 ```bash
