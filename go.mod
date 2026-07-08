@@ -1,3 +1,3 @@
-module suz-mock
+module github.com/alex-tomilov/suz-mock
 
 go 1.22
