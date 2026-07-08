@@ -1,7 +1,24 @@
 # SUZ API v3 Go mock
 
-Small local mock for contract/development tests when real SUZ credentials are unavailable.
-It focuses on stable response shapes from the API SUZ 3.0 examples and intentionally does not perform real authentication, signing, cryptography, or business validation.
+## Public safety notice
+
+This is an unofficial local contract-oriented mock server. It is not affiliated
+with, endorsed by, certified by, or supported by SUZ, Chestny Znak, or CRPT.
+
+Use it only for local development, parser tests, client integration tests, and
+contract checks where a predictable HTTP server is useful. It intentionally does
+not perform real authentication, request signing, cryptography, marking-code
+generation, or SUZ business validation.
+
+Do not commit or paste real credentials, OMS IDs, GTINs, order IDs,
+certificates, private keys, access tokens, client tokens, production request
+payloads, or proprietary examples into this repository. Keep examples synthetic
+and do not copy chunks from official PDFs, private integrations, or vendor
+documentation.
+
+Small local mock for contract/development tests when real SUZ credentials are
+unavailable. It focuses on stable response shapes for API v3 client code while
+remaining deliberately detached from real SUZ services.
 
 ## Run
 
@@ -18,7 +35,7 @@ SUZ_MOCK_ADDR=:9090 go run ./cmd/suz-mock
 ## Useful options
 
 ```bash
-# Require either clientToken or Authorization header.
+# Require either a mock clientToken or Authorization header.
 SUZ_MOCK_REQUIRE_TOKEN=true go run ./cmd/suz-mock
 
 # Generate dynamic order/report ids instead of deterministic fixture ids.
@@ -52,7 +69,7 @@ SUZ_MOCK_ORDER_ID=11111111-1111-4111-8111-111111111111 go run ./cmd/suz-mock
 
 ## API-scale / heavy-load helpers
 
-The PDF notes these useful scale boundaries:
+The API materials describe these useful scale boundaries:
 
 - up to 10 product positions in one emission order;
 - up to 2,000,000 codes for one GTIN in one order;
@@ -176,9 +193,14 @@ curl 'http://localhost:8080/api/v3/order/product?__scenario=empty'
 
 ## Smoke test
 
+The UUID-shaped values below are deterministic mock fixture IDs used by the
+default local server configuration.
+
 ```bash
-OMS_ID='cdf12109-10d3-11e6-8b6f-0050569977a1'
-GTIN='01334567894339'
+OMS_ID='mock-oms-local'
+GTIN='00000000000000'
+ORDER_ID='b024ae09-ef7c-449e-b461-05d8eb116c79'
+REPORT_ID='fab1c0e4-9590-4ed7-8d58-18862d6a9aab'
 
 curl -s "http://localhost:8080/api/v3/ping?omsId=$OMS_ID" | jq .
 
@@ -186,17 +208,17 @@ curl -s -X POST "http://localhost:8080/api/v3/order?omsId=$OMS_ID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -H 'clientToken: mock-token' \
-  -d '{"productGroup":"vetpharma","products":[{"gtin":"01334567894339","quantity":20,"templateId":50}]}' | jq .
+  -d "{\"productGroup\":\"mockpharma\",\"products\":[{\"gtin\":\"$GTIN\",\"quantity\":20,\"templateId\":50}]}" | jq .
 
-curl -s "http://localhost:8080/api/v3/order/status?omsId=$OMS_ID&orderId=b024ae09-ef7c-449e-b461-05d8eb116c79&gtin=$GTIN" | jq .
+curl -s "http://localhost:8080/api/v3/order/status?omsId=$OMS_ID&orderId=$ORDER_ID&gtin=$GTIN" | jq .
 
-curl -s "http://localhost:8080/api/v3/codes?omsId=$OMS_ID&orderId=b024ae09-ef7c-449e-b461-05d8eb116c79&gtin=$GTIN&quantity=2" | jq .
+curl -s "http://localhost:8080/api/v3/codes?omsId=$OMS_ID&orderId=$ORDER_ID&gtin=$GTIN&quantity=2" | jq .
 
 curl -s -X POST "http://localhost:8080/api/v3/utilisation?omsId=$OMS_ID" \
   -H 'Content-Type: application/json' \
-  -d '{"productGroup":"vetpharma","sntins":["010..."]}' | jq .
+  -d '{"productGroup":"mockpharma","sntins":["MOCK-CODE-0001"]}' | jq .
 
-curl -s "http://localhost:8080/api/v3/report/info?omsId=$OMS_ID&reportId=fab1c0e4-9590-4ed7-8d58-18862d6a9aab" | jq .
+curl -s "http://localhost:8080/api/v3/report/info?omsId=$OMS_ID&reportId=$REPORT_ID" | jq .
 ```
 
 ## Ruby client test idea
