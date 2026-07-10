@@ -13,6 +13,49 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
+func (s *Server) mockState(w http.ResponseWriter, r *http.Request) {
+	setCommonHeaders(w)
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+
+	s.mu.RLock()
+	orderCount := len(s.orders)
+	reportCount := len(s.reports)
+	s.mu.RUnlock()
+
+	s.rateMu.Lock()
+	rateWindowCount := len(s.rateWindows)
+	s.rateMu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"orders":      orderCount,
+		"reports":     reportCount,
+		"rateWindows": rateWindowCount,
+	})
+}
+
+func (s *Server) mockReset(w http.ResponseWriter, r *http.Request) {
+	setCommonHeaders(w)
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+
+	s.mu.Lock()
+	s.orders = make(map[string]*Order)
+	s.reports = make(map[string]*Report)
+	s.seed()
+	s.mu.Unlock()
+
+	s.rateMu.Lock()
+	s.rateWindows = make(map[string]*rateWindow)
+	s.rateMu.Unlock()
+
+	writeJSON(w, http.StatusOK, map[string]any{"status": "reset"})
+}
+
 func (s *Server) ping(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w, http.MethodGet)

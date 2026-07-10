@@ -8,11 +8,12 @@ import (
 )
 
 type Server struct {
-	mux     *http.ServeMux
-	logger  *slog.Logger
-	mu      sync.RWMutex
-	orders  map[string]*Order
-	reports map[string]*Report
+	mux       *http.ServeMux
+	logger    *slog.Logger
+	accessLog bool
+	mu        sync.RWMutex
+	orders    map[string]*Order
+	reports   map[string]*Report
 
 	rateMu      sync.Mutex
 	rateWindows map[string]*rateWindow
@@ -38,7 +39,7 @@ type Report struct {
 
 func NewServer(cfg Config) *http.Server {
 	addr := defaultString(cfg.Addr, ":8080")
-	handler := newHandler(cfg.Logger)
+	handler := newHandler(cfg)
 
 	return &http.Server{
 		Addr:    addr,
@@ -46,14 +47,15 @@ func NewServer(cfg Config) *http.Server {
 	}
 }
 
-func newHandler(logger *slog.Logger) *Server {
-	if logger == nil {
-		logger = slog.Default()
+func newHandler(cfg Config) *Server {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
 	}
 
 	s := &Server{
 		mux:         http.NewServeMux(),
-		logger:      logger,
+		logger:      cfg.Logger,
+		accessLog:   cfg.AccessLog,
 		orders:      make(map[string]*Order),
 		reports:     make(map[string]*Report),
 		rateWindows: make(map[string]*rateWindow),
@@ -68,13 +70,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	ww := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 	s.mux.ServeHTTP(ww, r)
-	s.logger.Info("request",
-		"method", r.Method,
-		"path", r.URL.Path,
-		"query", r.URL.RawQuery,
-		"status", ww.status,
-		"duration", time.Since(start).String(),
-	)
+	if s.accessLog {
+		s.logger.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"query", r.URL.RawQuery,
+			"status", ww.status,
+			"duration", time.Since(start).String(),
+		)
+	}
 }
 
 func (s *Server) seed() {

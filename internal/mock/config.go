@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,14 +29,44 @@ const (
 )
 
 type Config struct {
-	Addr   string
-	Logger *slog.Logger
+	Addr      string
+	Logger    *slog.Logger
+	LogLevel  slog.Level
+	AccessLog bool
+	JSONLogs  bool
 }
 
 func LoadConfigFromEnv() Config {
+	level := parseLogLevel(getenv("SUZ_MOCK_LOG_LEVEL", "info"))
+	jsonLogs := boolEnv("SUZ_MOCK_JSON_LOGS", false)
+
 	return Config{
-		Addr:   getenv("SUZ_MOCK_ADDR", ":8080"),
-		Logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		Addr:      getenv("SUZ_MOCK_ADDR", ":8080"),
+		Logger:    newLogger(os.Stdout, level, jsonLogs),
+		LogLevel:  level,
+		AccessLog: boolEnv("SUZ_MOCK_ACCESS_LOG", true),
+		JSONLogs:  jsonLogs,
+	}
+}
+
+func newLogger(out io.Writer, level slog.Level, jsonLogs bool) *slog.Logger {
+	opts := &slog.HandlerOptions{Level: level}
+	if jsonLogs {
+		return slog.New(slog.NewJSONHandler(out, opts))
+	}
+	return slog.New(slog.NewTextHandler(out, opts))
+}
+
+func parseLogLevel(value string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }
 

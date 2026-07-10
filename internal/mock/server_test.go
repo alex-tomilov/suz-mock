@@ -103,7 +103,8 @@ func TestRequireTokenRejectsMissingToken(t *testing.T) {
 
 func newTestHandler() http.Handler {
 	srv := NewServer(Config{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		AccessLog: false,
 	})
 	return srv.Handler
 }

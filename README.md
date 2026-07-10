@@ -105,6 +105,12 @@ SUZ_MOCK_DYNAMIC_IDS=true go run ./cmd/suz-mock
 
 # Override deterministic order id.
 SUZ_MOCK_ORDER_ID=11111111-1111-4111-8111-111111111111 go run ./cmd/suz-mock
+
+# Emit debug-level JSON logs.
+SUZ_MOCK_LOG_LEVEL=debug SUZ_MOCK_JSON_LOGS=true go run ./cmd/suz-mock
+
+# Disable per-request access logs.
+SUZ_MOCK_ACCESS_LOG=false go run ./cmd/suz-mock
 ```
 
 ## Endpoint coverage
@@ -112,6 +118,8 @@ SUZ_MOCK_ORDER_ID=11111111-1111-4111-8111-111111111111 go run ./cmd/suz-mock
 | Method | Endpoint | Status | Notes |
 | --- | --- | --- | --- |
 | GET | `/healthz` | implemented | Local container/process healthcheck |
+| GET | `/__mock/state` | implemented | Mock-only in-memory state counters |
+| POST | `/__mock/reset` | implemented | Mock-only reset to seeded state |
 | GET | `/api/v3/ping` | implemented | Happy path and forced errors |
 | POST | `/api/v3/order` | partial | Creates in-memory mock order; no real business validation |
 | GET | `/api/v3/order/status` | partial | Scenario-driven `ACTIVE`, `PENDING`, and `REJECTED` buffers |
@@ -189,6 +197,9 @@ curl -o /tmp/suz-codes-slow.json \
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `SUZ_MOCK_ADDR` | `:8080` | listen address |
+| `SUZ_MOCK_LOG_LEVEL` | `info` | log level: `debug`, `info`, `warn`, or `error` |
+| `SUZ_MOCK_ACCESS_LOG` | `true` | emit one request log entry per HTTP request |
+| `SUZ_MOCK_JSON_LOGS` | `false` | emit structured logs as JSON instead of text |
 | `SUZ_MOCK_REQUIRE_TOKEN` | `false` | require either `clientToken` or `Authorization` header |
 | `SUZ_MOCK_DYNAMIC_IDS` | `false` | generate dynamic mock order/report ids |
 | `SUZ_MOCK_ORDER_ID` | fixture id | override deterministic order id |

@@ -9,6 +9,8 @@ import (
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", s.healthz)
+	s.mux.HandleFunc("/__mock/state", s.mockState)
+	s.mux.HandleFunc("/__mock/reset", s.mockReset)
 
 	// API v3 routes for stable local client-contract testing.
 	s.mux.HandleFunc("/api/v3/ping", s.withCommon(s.ping))
