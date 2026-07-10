@@ -28,7 +28,22 @@ remaining deliberately detached from real SUZ services.
 - Code of conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - Changes: see [CHANGELOG.md](CHANGELOG.md).
 
-## Run
+## Quick start
+
+Start the mock, then point client tests at `http://localhost:8080`:
+
+```bash
+docker compose up --build
+```
+
+In another terminal:
+
+```bash
+curl -s http://localhost:8080/healthz
+curl -s 'http://localhost:8080/api/v3/ping?omsId=mock-oms-local'
+```
+
+## Local Go usage
 
 ```bash
 go run ./cmd/suz-mock
@@ -40,7 +55,7 @@ Default address: `:8080`.
 SUZ_MOCK_ADDR=:9090 go run ./cmd/suz-mock
 ```
 
-## Docker
+## Docker usage
 
 Build and run the local image:
 
@@ -61,7 +76,25 @@ Docker Compose is available for local use:
 docker compose up --build
 ```
 
-## Useful options
+## Ruby gem test usage
+
+Point your Ruby client or gem test suite at `http://localhost:8080` as the base
+SUZ URL. Keep the `/api/v3/...` paths unchanged.
+
+For request-signature tests, assert that your Ruby client sends headers such as
+`X-Signature`, `clientToken`, or `Authorization` where your integration requires
+them. This mock can require `clientToken` or `Authorization`, but it intentionally
+does not validate real signatures or cryptographic material.
+
+Recommended parser and retry test cases:
+
+1. `quantity=30000` for a realistic large JSON array.
+2. `quantity=150000` with `SUZ_MOCK_MAX_CODES_PER_RESPONSE=150000` for multi-GTIN order scale.
+3. `__stream=1&__flushEvery=500&__chunkDelay=10ms` to catch buffering/timeouts.
+4. `__rateLimit=1` or `SUZ_MOCK_RATE_LIMIT=true` to verify retry/backoff behavior.
+5. `__delay=2s` to verify request timeout configuration.
+
+## Useful local options
 
 ```bash
 # Require either a mock clientToken or Authorization header.
@@ -74,27 +107,29 @@ SUZ_MOCK_DYNAMIC_IDS=true go run ./cmd/suz-mock
 SUZ_MOCK_ORDER_ID=11111111-1111-4111-8111-111111111111 go run ./cmd/suz-mock
 ```
 
-## Implemented endpoints
+## Endpoint coverage
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/healthz` | mock healthcheck |
-| GET | `/api/v3/ping?omsId=...` | SUZ availability |
-| POST | `/api/v3/order?omsId=...` | create emission order |
-| GET | `/api/v3/order/status?omsId=...&orderId=...&gtin=...` | get code buffer status |
-| GET | `/api/v3/order/list?omsId=...` | list orders |
-| GET | `/api/v3/codes?omsId=...&orderId=...&gtin=...&quantity=...` | get codes |
-| GET | `/api/v3/order/codes/blocks?omsId=...&orderId=...&gtin=...` | list issued code blocks |
-| GET | `/api/v3/order/codes/retry?omsId=...&blockId=...` | retry getting codes by block id |
-| GET | `/api/v3/order/product?omsId=...&orderId=...` | product attributes |
-| POST | `/api/v3/order/close?omsId=...` | close order/suborder |
-| POST | `/api/v3/dropout?omsId=...` | dropout/rejection report |
-| POST | `/api/v3/aggregation?omsId=...` | aggregation report |
-| POST | `/api/v3/utilisation?omsId=...` | utilisation/application report |
-| POST | `/api/v3/surplus?omsId=...` | surplus acceptance report |
-| GET | `/api/v3/report/info?omsId=...&reportId=...` | report processing status |
-| GET | `/api/v3/providers?omsId=...` | service providers |
-| GET | `/api/v3/documents/content?omsId=...&docId=...` | document content |
+| Method | Endpoint | Status | Notes |
+| --- | --- | --- | --- |
+| GET | `/healthz` | implemented | Local container/process healthcheck |
+| GET | `/api/v3/ping` | implemented | Happy path and forced errors |
+| POST | `/api/v3/order` | partial | Creates in-memory mock order; no real business validation |
+| GET | `/api/v3/order/status` | partial | Scenario-driven `ACTIVE`, `PENDING`, and `REJECTED` buffers |
+| GET | `/api/v3/order/list` | partial | Lists in-memory orders or synthetic large order lists |
+| GET | `/api/v3/codes` | implemented | Supports streaming and huge responses |
+| GET | `/api/v3/order/codes/blocks` | partial | Synthetic code-block metadata |
+| GET | `/api/v3/order/codes/retry` | implemented | Returns codes by block id; supports streaming |
+| GET | `/api/v3/order/product` | partial | Synthetic product attributes and empty response scenario |
+| POST | `/api/v3/order/close` | partial | Marks in-memory mock order as closed |
+| POST | `/api/v3/dropout` | partial | Accepts body and returns mock report id |
+| POST | `/api/v3/aggregation` | partial | Accepts body and returns mock report id |
+| POST | `/api/v3/utilisation` | partial | Accepts body and returns mock report id |
+| POST | `/api/v3/surplus` | partial | Accepts body and returns mock report id |
+| GET | `/api/v3/report/info` | partial | Returns success by default or scenario-driven status |
+| GET | `/api/v3/providers` | implemented | Returns synthetic service-provider list |
+| GET | `/api/v3/documents/content` | partial | Returns synthetic document content with configurable `cislist` size |
+| any | real signing | not implemented | Intentionally skipped |
+| any | business validation | not implemented | Intentionally skipped |
 
 ## API-scale / heavy-load helpers
 
@@ -108,6 +143,10 @@ The API materials describe these useful scale boundaries:
 - create-order call rate mentioned as 100 requests/sec per IP + `omsId`.
 
 The mock does not validate every business rule, but it now lets you reproduce these shapes safely.
+
+`__scenario=api_max` may generate extremely large responses. Use it only
+intentionally. Prefer `__scenario=huge` or `__scenario=massive` for normal
+parser and load tests.
 
 ### Huge `/api/v3/codes` responses
 
@@ -145,10 +184,14 @@ curl -o /tmp/suz-codes-slow.json \
   'http://localhost:8080/api/v3/codes?omsId=test&quantity=30000&__stream=1&__flushEvery=500&__chunkDelay=10ms'
 ```
 
-Environment variables:
+## Environment variables
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
+| `SUZ_MOCK_ADDR` | `:8080` | listen address |
+| `SUZ_MOCK_REQUIRE_TOKEN` | `false` | require either `clientToken` or `Authorization` header |
+| `SUZ_MOCK_DYNAMIC_IDS` | `false` | generate dynamic mock order/report ids |
+| `SUZ_MOCK_ORDER_ID` | fixture id | override deterministic order id |
 | `SUZ_MOCK_MAX_CODES_PER_RESPONSE` | `30000` | safety cap for `/api/v3/codes` and retry-code responses |
 | `SUZ_MOCK_STREAM_THRESHOLD` | `1000` | responses above this count are streamed |
 | `SUZ_MOCK_STREAM_FLUSH_EVERY` | `1000` | flush interval for streamed JSON arrays |
@@ -157,6 +200,8 @@ Environment variables:
 | `SUZ_MOCK_MAX_BLOCKS` | `1000` | cap for synthetic code-block list size |
 | `SUZ_MOCK_MAX_PRODUCTS` | `10` | cap for product-attributes map size |
 | `SUZ_MOCK_MAX_DOCUMENT_ITEMS` | `30000` | cap for synthetic document `cislist` size |
+| `SUZ_MOCK_RATE_LIMIT` | `false` | enable mock 429 responses globally |
+| `SUZ_MOCK_RATE_LIMIT_PER_SECOND` | `100` | allowed requests per second per remote address, `omsId`, and path |
 
 ### Synthetic large lists
 
@@ -191,7 +236,31 @@ SUZ_MOCK_RATE_LIMIT=true SUZ_MOCK_RATE_LIMIT_PER_SECOND=100 go run ./cmd/suz-moc
 curl 'http://localhost:8080/api/v3/ping?omsId=test&__rateLimit=1'
 ```
 
-## Scenarios
+## Scenario query parameters
+
+| Parameter | Example | Effect |
+| --- | --- | --- |
+| `__scenario` | `active` | active order buffer status for `/api/v3/order/status` |
+| `__scenario` | `pending` | pending order buffer status for `/api/v3/order/status` |
+| `__scenario` | `rejected` | rejected order buffer status for `/api/v3/order/status` |
+| `__scenario` | `huge` | 30,000-code responses and large synthetic lists |
+| `__scenario` | `massive` | 150,000-code response target before safety caps |
+| `__scenario` | `api_max` | 2,000,000-code response target before safety caps |
+| `__scenario` | `empty` | empty product-attributes response |
+| `__scenario` | `failed` | failed report status for `/api/v3/report/info` |
+| `__scenario` | `in_progress` | in-progress report status for `/api/v3/report/info` |
+| `__error` | `400` | force an API-like error response; supports HTTP `4xx` and `5xx` |
+| `__delay` | `2s` | sleep before responding; also accepts milliseconds as a number |
+| `__rateLimit` | `1` | enable mock rate limiting for the request path |
+| `__stream` | `1` | stream code responses regardless of quantity |
+| `__flushEvery` | `500` | flush streamed code responses every N codes |
+| `__chunkDelay` | `10ms` | pause after each streaming flush |
+| `__orders` | `100` | synthetic order-list count |
+| `__buffers` | `10` | synthetic buffers per order-list item |
+| `__blocks` | `1000` | synthetic code-block count |
+| `__blockQuantity` | `1000` | synthetic quantity per code block |
+| `__products` | `10` | synthetic product-attributes count |
+| `__items` | `30000` | synthetic document `cislist` item count |
 
 Force API-like error response:
 
@@ -249,16 +318,3 @@ curl -s -X POST "http://localhost:8080/api/v3/utilisation?omsId=$OMS_ID" \
 
 curl -s "http://localhost:8080/api/v3/report/info?omsId=$OMS_ID&reportId=$REPORT_ID" | jq .
 ```
-
-## Ruby client test idea
-
-Point your gem at `http://localhost:8080` as the base SUZ URL. Keep the `/api/v3/...` paths unchanged.
-For request-signature tests, assert that your Ruby client sends `X-Signature`, but let this mock ignore the value.
-
-Recommended parser stress test cases:
-
-1. `quantity=30000` for a realistic large JSON array.
-2. `quantity=150000` with `SUZ_MOCK_MAX_CODES_PER_RESPONSE=150000` for multi-GTIN order scale.
-3. `__stream=1&__flushEvery=500&__chunkDelay=10ms` to catch buffering/timeouts.
-4. `__rateLimit=1` or `SUZ_MOCK_RATE_LIMIT=true` to verify retry/backoff behavior.
-5. `__delay=2s` to verify request timeout configuration.
