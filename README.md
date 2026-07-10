@@ -40,6 +40,27 @@ Default address: `:8080`.
 SUZ_MOCK_ADDR=:9090 go run ./cmd/suz-mock
 ```
 
+## Docker
+
+Build and run the local image:
+
+```bash
+docker build -t suz-mock:local .
+docker run --rm -p 8080:8080 suz-mock:local
+```
+
+When a published image is available, run it directly:
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/alex-tomilov/suz-mock:latest
+```
+
+Docker Compose is available for local use:
+
+```bash
+docker compose up --build
+```
+
 ## Useful options
 
 ```bash
